@@ -11,7 +11,7 @@ go get github.com/xshkut/go-comments-extractor
 ## Usage
 
 ```bash
-go run github.com/xshkut/go-comments-extractor/cmd/generator -i ./playground/go -o ./playground/schema.sql -p SQL -c "--" -h "Generated SQL Schema"
+go run github.com/xshkut/go-comments-extractor/cmd/generator --help
 ```
 
 ```
@@ -38,5 +38,5 @@ In [example/go](./example/go) we have sql schema distributed across Go source co
 After running the tool (command below) we will have a single file [example/schema.sql](./example/schema.sql) with all SQL schema components. Later that may be used to see the schema diffs in a single place.
 
 ```bash
-go run github.com/xshkut/go-comments-extractor/cmd/generator -i ./playground/go -o ./playground/schema.sql -p SQL -c "--" -h "Generated SQL Schema"
+go run github.com/xshkut/go-comments-extractor/cmd/generator -i ./example/go -o ./example/schema.sql -p SQL -c "--" -h "Generated SQL Schema"
 ```
