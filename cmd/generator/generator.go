@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-type codeGenerator struct {
+type commentsExtractor struct {
 	inputPath           string
 	outputPath          string
 	inputPattern        string
@@ -16,7 +16,7 @@ type codeGenerator struct {
 	header              string
 }
 
-func (g *codeGenerator) GenerateSchemaFile() error {
+func (g *commentsExtractor) ExtractComments() error {
 	inputAbsPath, err := filepath.Abs(g.inputPath)
 	if err != nil {
 		return fmt.Errorf("get abs path [%s]: %w", g.inputPath, err)
@@ -46,10 +46,17 @@ func (g *codeGenerator) GenerateSchemaFile() error {
 	return nil
 }
 
-func (g *codeGenerator) extractCommentsFromFiles(goFiles []string, outputAbsPath string, outputFile *os.File) error {
+func (g *commentsExtractor) extractCommentsFromFiles(goFiles []string, outputAbsPath string, outputFile *os.File) error {
 	prependWithNewLine := false
 
 	for _, filePath := range goFiles {
+		relPath, err := filepath.Rel(outputAbsPath, filePath)
+		if err != nil {
+			return fmt.Errorf("calculate relative path: %w", err)
+		}
+
+		link := fmt.Sprintf("%s source: %s\n", g.outputCommentPrefix, relPath)
+
 		content, err := os.ReadFile(filePath)
 		if err != nil {
 			return fmt.Errorf("read file [%s]: %w", filePath, err)
@@ -64,40 +71,42 @@ func (g *codeGenerator) extractCommentsFromFiles(goFiles []string, outputAbsPath
 			continue
 		}
 
-		relPath, err := filepath.Rel(outputAbsPath, filePath)
+		err = appendContent(prependWithNewLine, outputFile, link, lines)
 		if err != nil {
-			return fmt.Errorf("calculate relative path: %w", err)
-		}
-
-		if prependWithNewLine {
-			if _, err := outputFile.WriteString("\n"); err != nil {
-				return fmt.Errorf("write line to output file: %w", err)
-			}
+			return fmt.Errorf("append content: %w", err)
 		}
 
 		prependWithNewLine = true
-
-		link := fmt.Sprintf("%s source: %s\n", g.outputCommentPrefix, relPath)
-
-		if _, err := outputFile.WriteString(link); err != nil {
-			return fmt.Errorf("write line to output file: %w", err)
-		}
-
-		schemaContent := strings.Join(lines, "\n")
-
-		if _, err := outputFile.WriteString(schemaContent); err != nil {
-			return fmt.Errorf("write line to output file: %w", err)
-		}
-
-		if _, err := outputFile.WriteString("\n"); err != nil {
-			return fmt.Errorf("write line to output file: %w", err)
-		}
 	}
 
 	return nil
 }
 
-func scanLines(content []byte, g *codeGenerator) ([]string, error) {
+func appendContent(prependWithNewLine bool, outputFile *os.File, link string, lines []string) error {
+	if prependWithNewLine {
+		if _, err := outputFile.WriteString("\n"); err != nil {
+			return fmt.Errorf("write line to output file: %w", err)
+		}
+	}
+
+	if _, err := outputFile.WriteString(link); err != nil {
+		return fmt.Errorf("write line to output file: %w", err)
+	}
+
+	schemaContent := strings.Join(lines, "\n")
+
+	if _, err := outputFile.WriteString(schemaContent); err != nil {
+		return fmt.Errorf("write line to output file: %w", err)
+	}
+
+	if _, err := outputFile.WriteString("\n"); err != nil {
+		return fmt.Errorf("write line to output file: %w", err)
+	}
+
+	return nil
+}
+
+func scanLines(content []byte, g *commentsExtractor) ([]string, error) {
 	scanner := bufio.NewScanner(strings.NewReader(string(content)))
 	scanner.Split(bufio.ScanLines)
 
@@ -128,7 +137,7 @@ func scanLines(content []byte, g *codeGenerator) ([]string, error) {
 	return lines, nil
 }
 
-func (g *codeGenerator) getGoFiles(dir string) ([]string, error) {
+func (g *commentsExtractor) getGoFiles(dir string) ([]string, error) {
 	var goFiles []string
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {

@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	g := codeGenerator{
+	g := commentsExtractor{
 		inputPattern:        inputPrefix,
 		inputPath:           inputPath,
 		outputPath:          outputFile,
@@ -14,7 +14,7 @@ func main() {
 		header:              header,
 	}
 
-	err := g.GenerateSchemaFile()
+	err := g.ExtractComments()
 	if err != nil {
 		fmt.Printf("Schema generation failed: %s\n", err)
 		os.Exit(1)
