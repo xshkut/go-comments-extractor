@@ -99,11 +99,7 @@ func getRelPathLink(outputAbsPath string, filePath string) (string, error) {
 	outputFolder := filepath.Dir(outputAbsPath)
 	relPath, err := filepath.Rel(outputFolder, filePath)
 
-	if strings.HasPrefix(relPath, "../") {
-		relPath = "file://" + relPath
-	} else {
-		relPath = "file://./" + relPath
-	}
+	relPath = "file://./" + relPath
 
 	return relPath, err
 }
