@@ -46,22 +46,23 @@ func (g *commentsExtractor) ExtractComments() error {
 	return nil
 }
 
-func (g *commentsExtractor) extractCommentsFromFilesAndSave(goFiles []string, outputAbsPath string, outputFile *os.File) error {
+func (g *commentsExtractor) extractCommentsFromFilesAndSave(files []string, outputAbsPath string, outputFile *os.File) error {
 	if g.header != "" {
-		verticalGap := []string{"\n\n"}
-		err := appendContent(outputFile, g.header, verticalGap)
+		headerContent := []string{g.header, "\n"}
+
+		err := appendContent(outputFile, headerContent)
 		if err != nil {
 			return fmt.Errorf("append header: %w", err)
 		}
 	}
 
-	for i, filePath := range goFiles {
+	for i, filePath := range files {
 		relPath, err := filepath.Rel(outputAbsPath, filePath)
 		if err != nil {
 			return fmt.Errorf("calculate relative path: %w", err)
 		}
 
-		link := fmt.Sprintf("%s source: %s\n", g.outputCommentPrefix, relPath)
+		link := fmt.Sprintf("%s source: %s", g.outputCommentPrefix, relPath)
 
 		content, err := os.ReadFile(filePath)
 		if err != nil {
@@ -77,12 +78,15 @@ func (g *commentsExtractor) extractCommentsFromFilesAndSave(goFiles []string, ou
 			continue
 		}
 
-		lastFile := i == len(goFiles)-1
+		lastFile := i == len(files)-1
 		if !lastFile {
-			lines = append(lines, "\n")
+			lines = append(lines, "")
 		}
+		lines = append(lines, "")
 
-		err = appendContent(outputFile, link, lines)
+		lines = append([]string{link, ""}, lines...)
+
+		err = appendContent(outputFile, lines)
 		if err != nil {
 			return fmt.Errorf("append content: %w", err)
 		}
@@ -91,13 +95,7 @@ func (g *commentsExtractor) extractCommentsFromFilesAndSave(goFiles []string, ou
 	return nil
 }
 
-func appendContent(outputFile *os.File, link string, lines []string) error {
-	if link != "" {
-		if _, err := outputFile.WriteString(link); err != nil {
-			return fmt.Errorf("write line to output file: %w", err)
-		}
-	}
-
+func appendContent(outputFile *os.File, lines []string) error {
 	schemaContent := strings.Join(lines, "\n")
 
 	if _, err := outputFile.WriteString(schemaContent); err != nil {
@@ -115,6 +113,9 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 
 	var extracting bool
 
+	multilinePrefix := fmt.Sprintf("/* %s:", inputPattern)
+	singlelinePrefix := fmt.Sprintf("// %s:", inputPattern)
+
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -125,9 +126,14 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 			}
 
 			lines = append(lines, line)
-		} else if strings.HasPrefix(line, fmt.Sprintf("/* %s", inputPattern)) {
+		} else if strings.HasPrefix(line, multilinePrefix) {
 			extracting = true
-			lines = append(lines, strings.TrimPrefix(line, fmt.Sprintf("/* %s", inputPattern)))
+		} else if strings.HasPrefix(line, singlelinePrefix) {
+			line = strings.TrimPrefix(line, singlelinePrefix)
+			line = strings.TrimSpace(line)
+			lines = append(lines, line)
+		} else {
+			continue
 		}
 	}
 

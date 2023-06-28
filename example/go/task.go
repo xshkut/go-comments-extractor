@@ -1,6 +1,6 @@
 package main
 
-/* SQL
+/* SQL:
 CREATE TABLE task (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,

@@ -1,8 +1,8 @@
 package main
 
-/* SQL
-CREATE TYPE file_source AS ENUM ('aws_s3', 'google_slides', 'text');
+// SQL: CREATE TYPE file_source AS ENUM ('aws_s3', 'google_slides', 'text');
 
+/* SQL:
 CREATE TABLE file (
     id SERIAL PRIMARY KEY,
     source file_source NOT NULL,

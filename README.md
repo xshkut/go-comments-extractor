@@ -15,16 +15,16 @@ go run github.com/xshkut/go-comments-extractor/cmd/generator -i ./playground/go 
 ```
 
 ```
--c string
-      Prefix for comments in the output file. Optional
--h string
-      Header of the output file. Optional
 -i string
       Root input path (file or folder) (default "./")
 -o string
       Output file. Required
 -p string
-      Prefix going right after the beginning of Go multiline comment plus whitespace. Required
+      Prefix to pick comment body by patter: "/* PREFIX:" or "// PREFIX: ". Required
+-c string
+      Prefix for comments in the output file. Optional
+-h string
+      Header of the output file. Optional
 ```
 
 ## Motivation:

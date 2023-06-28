@@ -1,6 +1,6 @@
 package main
 
-/* SQL
+/* SQL:
 CREATE TABLE page (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE page (
 );
 */
 
-/* SQL
+/* SQL:
 CREATE TABLE task_page (
     task_id INTEGER NOT NULL REFERENCES tasks(id),
     page_id INTEGER NOT NULL REFERENCES pages(id),
