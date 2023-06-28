@@ -1,6 +1,6 @@
 -- Generated SQL Schema. Do not edit.
 
--- source: ../go/file.go
+-- source: file://./go/file.go
 
 CREATE TYPE file_source AS ENUM ('aws_s3', 'google_slides', 'text');
 
@@ -12,7 +12,7 @@ CREATE TABLE file (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
--- source: ../go/page.go
+-- source: file://./go/page.go
 
 CREATE TABLE page (
     id SERIAL PRIMARY KEY,
@@ -29,7 +29,7 @@ CREATE TABLE task_page (
     PRIMARY KEY (task_id, page_id, position)
 );
 
--- source: ../go/task.go
+-- source: file://./go/task.go
 
 CREATE TABLE task (
     id SERIAL PRIMARY KEY,

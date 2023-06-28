@@ -58,12 +58,12 @@ func (g *commentsExtractor) extractCommentsFromFilesAndSave(files []string, outp
 	}
 
 	for i, filePath := range files {
-		relPath, err := filepath.Rel(outputAbsPath, filePath)
+		relPathLink, err := getRelPathLink(outputAbsPath, filePath)
 		if err != nil {
 			return fmt.Errorf("calculate relative path: %w", err)
 		}
 
-		link := fmt.Sprintf("%s source: %s", g.outputCommentPrefix, relPath)
+		link := fmt.Sprintf("%s source: %s", g.outputCommentPrefix, relPathLink)
 
 		content, err := os.ReadFile(filePath)
 		if err != nil {
@@ -93,6 +93,19 @@ func (g *commentsExtractor) extractCommentsFromFilesAndSave(files []string, outp
 	}
 
 	return nil
+}
+
+func getRelPathLink(outputAbsPath string, filePath string) (string, error) {
+	outputFolder := filepath.Dir(outputAbsPath)
+	relPath, err := filepath.Rel(outputFolder, filePath)
+
+	if strings.HasPrefix(relPath, "../") {
+		relPath = "file://" + relPath
+	} else {
+		relPath = "file://./" + relPath
+	}
+
+	return relPath, err
 }
 
 func appendContent(outputFile *os.File, lines []string) error {
