@@ -47,10 +47,12 @@ func (g *commentsExtractor) ExtractComments() error {
 }
 
 func (g *commentsExtractor) extractCommentsFromFilesAndSave(goFiles []string, outputAbsPath string, outputFile *os.File) error {
-	verticalGap := []string{"\n\n"}
-	err := appendContent(outputFile, g.header, verticalGap)
-	if err != nil {
-		return fmt.Errorf("append header: %w", err)
+	if g.header != "" {
+		verticalGap := []string{"\n\n"}
+		err := appendContent(outputFile, g.header, verticalGap)
+		if err != nil {
+			return fmt.Errorf("append header: %w", err)
+		}
 	}
 
 	for i, filePath := range goFiles {
