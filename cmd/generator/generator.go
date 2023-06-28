@@ -3,50 +3,45 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-type CodeGenerator struct {
-	Pattern       string
-	Path          string
-	outputPath    string
-	CommentPrefix string
-	Header        string
+type codeGenerator struct {
+	inputPath           string
+	outputPath          string
+	inputPattern        string
+	outputCommentPrefix string
+	header              string
 }
 
-func (g *CodeGenerator) GenerateSchemaFile() error {
-	// Get the absolute path of the specified directory
-	inputAbsPath, err := filepath.Abs(g.Path)
+func (g *codeGenerator) GenerateSchemaFile() error {
+	inputAbsPath, err := filepath.Abs(g.inputPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("get abs path [%s]: %w", g.inputPath, err)
 	}
 
 	outputAbsPath, err := filepath.Abs(g.outputPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("get abs path [%s]: %w", g.outputPath, err)
 	}
 
-	// Get a list of Go files in the specified directory and its subdirectories
 	goFiles, err := g.getGoFiles(inputAbsPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("list files [%s]: %w", inputAbsPath, err)
 	}
 
-	// Open the output schema file in write mode
 	outputFile, err := os.Create(g.outputPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("create output file [%s]: %w", g.outputPath, err)
 	}
 	defer outputFile.Close()
 
 	prependWithNewLine := false
 
-	// Iterate over each Go file and extract the schema content
 	for _, filePath := range goFiles {
-		content, err := ioutil.ReadFile(filePath)
+		content, err := os.ReadFile(filePath)
 		if err != nil {
 			return fmt.Errorf("read file [%s]: %w", filePath, err)
 		}
@@ -67,9 +62,9 @@ func (g *CodeGenerator) GenerateSchemaFile() error {
 				}
 
 				lines = append(lines, line)
-			} else if strings.HasPrefix(line, fmt.Sprintf("/* %s", g.Pattern)) {
+			} else if strings.HasPrefix(line, fmt.Sprintf("/* %s", g.inputPattern)) {
 				extracting = true
-				lines = append(lines, strings.TrimPrefix(line, fmt.Sprintf("/* %s", g.Pattern)))
+				lines = append(lines, strings.TrimPrefix(line, fmt.Sprintf("/* %s", g.inputPattern)))
 			}
 		}
 
@@ -94,7 +89,7 @@ func (g *CodeGenerator) GenerateSchemaFile() error {
 
 		prependWithNewLine = true
 
-		link := fmt.Sprintf("%s source: %s\n", g.CommentPrefix, relPath)
+		link := fmt.Sprintf("%s source: %s\n", g.outputCommentPrefix, relPath)
 
 		if _, err := outputFile.WriteString(link); err != nil {
 			return fmt.Errorf("write line to output file: %w", err)
@@ -102,7 +97,6 @@ func (g *CodeGenerator) GenerateSchemaFile() error {
 
 		schemaContent := strings.Join(lines, "\n")
 
-		// Write the extracted schema content to the output file
 		if _, err := outputFile.WriteString(schemaContent); err != nil {
 			return fmt.Errorf("write line to output file: %w", err)
 		}
@@ -115,8 +109,7 @@ func (g *CodeGenerator) GenerateSchemaFile() error {
 	return nil
 }
 
-// Helper function to get a list of Go files in the specified directory and its subdirectories
-func (g *CodeGenerator) getGoFiles(dir string) ([]string, error) {
+func (g *codeGenerator) getGoFiles(dir string) ([]string, error) {
 	var goFiles []string
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {

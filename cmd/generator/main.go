@@ -6,12 +6,12 @@ import (
 )
 
 func main() {
-	g := CodeGenerator{
-		Pattern:       inputPrefix,
-		Path:          inputPath,
-		outputPath:    outputFile,
-		CommentPrefix: outputPrefix,
-		Header:        header,
+	g := codeGenerator{
+		inputPattern:        inputPrefix,
+		inputPath:           inputPath,
+		outputPath:          outputFile,
+		outputCommentPrefix: outputPrefix,
+		header:              header,
 	}
 
 	err := g.GenerateSchemaFile()
