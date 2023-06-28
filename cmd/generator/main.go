@@ -7,9 +7,11 @@ import (
 
 func main() {
 	g := CodeGenerator{
-		Pattern:    inputPrefix,
-		Path:       inputPath,
-		outputPath: outputFile,
+		Pattern:       inputPrefix,
+		Path:          inputPath,
+		outputPath:    outputFile,
+		CommentPrefix: outputPrefix,
+		Header:        header,
 	}
 
 	err := g.GenerateSchemaFile()

@@ -10,9 +10,11 @@ import (
 )
 
 type CodeGenerator struct {
-	Pattern    string
-	Path       string
-	outputPath string
+	Pattern       string
+	Path          string
+	outputPath    string
+	CommentPrefix string
+	Header        string
 }
 
 func (g *CodeGenerator) GenerateSchemaFile() error {
@@ -39,6 +41,8 @@ func (g *CodeGenerator) GenerateSchemaFile() error {
 		return err
 	}
 	defer outputFile.Close()
+
+	prependWithNewLine := false
 
 	// Iterate over each Go file and extract the schema content
 	for _, filePath := range goFiles {
@@ -82,8 +86,15 @@ func (g *CodeGenerator) GenerateSchemaFile() error {
 			return fmt.Errorf("calculate relative path: %w", err)
 		}
 
-		// TODO: get line number of the comment
-		link := fmt.Sprintf("source: %s:%d\n", relPath, 0)
+		if prependWithNewLine {
+			if _, err := outputFile.WriteString("\n"); err != nil {
+				return fmt.Errorf("write line to output file: %w", err)
+			}
+		}
+
+		prependWithNewLine = true
+
+		link := fmt.Sprintf("%s source: %s\n", g.CommentPrefix, relPath)
 
 		if _, err := outputFile.WriteString(link); err != nil {
 			return fmt.Errorf("write line to output file: %w", err)
