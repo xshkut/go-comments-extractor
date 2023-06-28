@@ -38,7 +38,7 @@ func (g *commentsExtractor) ExtractComments() error {
 	}
 	defer outputFile.Close()
 
-	err = g.extractCommentsFromFiles(goFiles, outputAbsPath, outputFile)
+	err = g.extractCommentsFromFilesAndSave(goFiles, outputAbsPath, outputFile)
 	if err != nil {
 		return fmt.Errorf("extract comments: %w", err)
 	}
@@ -46,10 +46,14 @@ func (g *commentsExtractor) ExtractComments() error {
 	return nil
 }
 
-func (g *commentsExtractor) extractCommentsFromFiles(goFiles []string, outputAbsPath string, outputFile *os.File) error {
-	prependWithNewLine := false
+func (g *commentsExtractor) extractCommentsFromFilesAndSave(goFiles []string, outputAbsPath string, outputFile *os.File) error {
+	verticalGap := []string{"\n\n"}
+	err := appendContent(outputFile, g.header, verticalGap)
+	if err != nil {
+		return fmt.Errorf("append header: %w", err)
+	}
 
-	for _, filePath := range goFiles {
+	for i, filePath := range goFiles {
 		relPath, err := filepath.Rel(outputAbsPath, filePath)
 		if err != nil {
 			return fmt.Errorf("calculate relative path: %w", err)
@@ -62,7 +66,7 @@ func (g *commentsExtractor) extractCommentsFromFiles(goFiles []string, outputAbs
 			return fmt.Errorf("read file [%s]: %w", filePath, err)
 		}
 
-		lines, err := scanLines(content, g)
+		lines, err := scanLines(content, g.inputPattern)
 		if err != nil {
 			return fmt.Errorf("scan lines in file [%s]: %w", filePath, err)
 		}
@@ -71,26 +75,25 @@ func (g *commentsExtractor) extractCommentsFromFiles(goFiles []string, outputAbs
 			continue
 		}
 
-		err = appendContent(prependWithNewLine, outputFile, link, lines)
+		lastFile := i == len(goFiles)-1
+		if !lastFile {
+			lines = append(lines, "\n")
+		}
+
+		err = appendContent(outputFile, link, lines)
 		if err != nil {
 			return fmt.Errorf("append content: %w", err)
 		}
-
-		prependWithNewLine = true
 	}
 
 	return nil
 }
 
-func appendContent(prependWithNewLine bool, outputFile *os.File, link string, lines []string) error {
-	if prependWithNewLine {
-		if _, err := outputFile.WriteString("\n"); err != nil {
+func appendContent(outputFile *os.File, link string, lines []string) error {
+	if link != "" {
+		if _, err := outputFile.WriteString(link); err != nil {
 			return fmt.Errorf("write line to output file: %w", err)
 		}
-	}
-
-	if _, err := outputFile.WriteString(link); err != nil {
-		return fmt.Errorf("write line to output file: %w", err)
 	}
 
 	schemaContent := strings.Join(lines, "\n")
@@ -99,14 +102,10 @@ func appendContent(prependWithNewLine bool, outputFile *os.File, link string, li
 		return fmt.Errorf("write line to output file: %w", err)
 	}
 
-	if _, err := outputFile.WriteString("\n"); err != nil {
-		return fmt.Errorf("write line to output file: %w", err)
-	}
-
 	return nil
 }
 
-func scanLines(content []byte, g *commentsExtractor) ([]string, error) {
+func scanLines(content []byte, inputPattern string) ([]string, error) {
 	scanner := bufio.NewScanner(strings.NewReader(string(content)))
 	scanner.Split(bufio.ScanLines)
 
@@ -124,9 +123,9 @@ func scanLines(content []byte, g *commentsExtractor) ([]string, error) {
 			}
 
 			lines = append(lines, line)
-		} else if strings.HasPrefix(line, fmt.Sprintf("/* %s", g.inputPattern)) {
+		} else if strings.HasPrefix(line, fmt.Sprintf("/* %s", inputPattern)) {
 			extracting = true
-			lines = append(lines, strings.TrimPrefix(line, fmt.Sprintf("/* %s", g.inputPattern)))
+			lines = append(lines, strings.TrimPrefix(line, fmt.Sprintf("/* %s", inputPattern)))
 		}
 	}
 
