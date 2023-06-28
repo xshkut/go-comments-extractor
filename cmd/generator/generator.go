@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -82,7 +83,6 @@ func (g *commentsExtractor) extractCommentsFromFilesAndSave(files []string, outp
 		if !lastFile {
 			lines = append(lines, "")
 		}
-		lines = append(lines, "")
 
 		lines = append([]string{link, ""}, lines...)
 
@@ -122,7 +122,8 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 		if extracting {
 			if strings.HasPrefix(line, "*/") {
 				extracting = false
-				break
+				lines = append(lines, "")
+				continue
 			}
 
 			lines = append(lines, line)
@@ -131,7 +132,9 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 		} else if strings.HasPrefix(line, singlelinePrefix) {
 			line = strings.TrimPrefix(line, singlelinePrefix)
 			line = strings.TrimSpace(line)
+
 			lines = append(lines, line)
+			lines = append(lines, "")
 		} else {
 			continue
 		}
@@ -158,6 +161,8 @@ func (g *commentsExtractor) getGoFiles(dir string) ([]string, error) {
 
 		return nil
 	})
+
+	sort.Strings(goFiles)
 
 	return goFiles, err
 }
