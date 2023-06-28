@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&inputPath, "i", "./", "Root input path (file or folder). Default: ./")
+	flag.StringVar(&inputPath, "i", "./", "Root input path (file or folder)")
 	flag.StringVar(&outputFile, "o", "", "Output file. Required")
 	flag.StringVar(&inputPrefix, "p", "", "Prefix going right after the beginning of Go multiline comment plus whitespace. Required")
 	flag.StringVar(&outputPrefix, "c", "", "Prefix for comments in the output file. Optional")
