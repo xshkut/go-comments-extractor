@@ -38,6 +38,15 @@ func (g *codeGenerator) GenerateSchemaFile() error {
 	}
 	defer outputFile.Close()
 
+	err = g.extractCommentsFromFiles(goFiles, outputAbsPath, outputFile)
+	if err != nil {
+		return fmt.Errorf("extract comments: %w", err)
+	}
+
+	return nil
+}
+
+func (g *codeGenerator) extractCommentsFromFiles(goFiles []string, outputAbsPath string, outputFile *os.File) error {
 	prependWithNewLine := false
 
 	for _, filePath := range goFiles {
@@ -46,29 +55,8 @@ func (g *codeGenerator) GenerateSchemaFile() error {
 			return fmt.Errorf("read file [%s]: %w", filePath, err)
 		}
 
-		scanner := bufio.NewScanner(strings.NewReader(string(content)))
-		scanner.Split(bufio.ScanLines)
-
-		var lines []string
-		var extracting bool
-
-		for scanner.Scan() {
-			line := scanner.Text()
-
-			if extracting {
-				if strings.HasPrefix(line, "*/") {
-					extracting = false
-					break
-				}
-
-				lines = append(lines, line)
-			} else if strings.HasPrefix(line, fmt.Sprintf("/* %s", g.inputPattern)) {
-				extracting = true
-				lines = append(lines, strings.TrimPrefix(line, fmt.Sprintf("/* %s", g.inputPattern)))
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
+		lines, err := scanLines(content, g)
+		if err != nil {
 			return fmt.Errorf("scan lines in file [%s]: %w", filePath, err)
 		}
 
@@ -107,6 +95,37 @@ func (g *codeGenerator) GenerateSchemaFile() error {
 	}
 
 	return nil
+}
+
+func scanLines(content []byte, g *codeGenerator) ([]string, error) {
+	scanner := bufio.NewScanner(strings.NewReader(string(content)))
+	scanner.Split(bufio.ScanLines)
+
+	lines := make([]string, 0)
+
+	var extracting bool
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if extracting {
+			if strings.HasPrefix(line, "*/") {
+				extracting = false
+				break
+			}
+
+			lines = append(lines, line)
+		} else if strings.HasPrefix(line, fmt.Sprintf("/* %s", g.inputPattern)) {
+			extracting = true
+			lines = append(lines, strings.TrimPrefix(line, fmt.Sprintf("/* %s", g.inputPattern)))
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanner error: %w", err)
+	}
+
+	return lines, nil
 }
 
 func (g *codeGenerator) getGoFiles(dir string) ([]string, error) {
