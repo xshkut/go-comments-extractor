@@ -7,8 +7,7 @@ type input[T any] interface {
 
 type output[T any] interface {
 	Write(t T)
-	End()
-	Destroy(err error)
+	End(err error)
 }
 
 // chain implements input
@@ -22,7 +21,7 @@ type chain[T any] struct {
 	ch  chan T
 }
 
-// Error should be called after each receiving from the Chan()
+// Error checks if there was an error in the chain
 func (s *chain[T]) Error() error {
 	return s.err
 }
@@ -42,12 +41,8 @@ func (s *chain[T]) Write(t T) {
 	s.ch <- t
 }
 
-func (s *chain[T]) End() {
-	close(s.ch)
-}
-
-// Destroy should not be called after End() or vise-versa
-func (s *chain[T]) Destroy(err error) {
+// End closes channel and sets error
+func (s *chain[T]) End(err error) {
 	s.err = err
 
 	close(s.ch)

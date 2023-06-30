@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,25 +28,29 @@ func (g *commentsExtractor) ExtractComments() error {
 		return fmt.Errorf("get abs path [%s]: %w", g.outputPath, err)
 	}
 
+	ctx := context.Context(context.Background())
+
 	filePaths := newStream[string](64)
 	content := newStream[[]string](64)
-	result := newStream[struct{}](64)
+	result := newStream[struct{}](0)
 
-	go g.getGoFiles(inputAbsPath, filePaths)
+	go g.getGoFiles(ctx, inputAbsPath, filePaths)
 	go g.extractComments(filePaths, content, outputAbsPath)
 	go g.saveContent(content, result, outputAbsPath)
 
 	<-result.Chan()
 
-	if err := result.Error(); err != nil {
-		return fmt.Errorf("chain error: %w", err)
-	}
+	ctx.Done()
 
-	return nil
+	return wrapIfError(err, "chain error")
 }
 
-func (g *commentsExtractor) getGoFiles(dir string, files output[string]) {
+func (g *commentsExtractor) getGoFiles(ctx context.Context, dir string, files output[string]) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("context error: %w", err)
+		}
+
 		if err != nil {
 			return fmt.Errorf("walking to %s: %w", path, err)
 		}
@@ -57,28 +62,18 @@ func (g *commentsExtractor) getGoFiles(dir string, files output[string]) {
 		return nil
 	})
 
-	if err != nil {
-		files.Destroy(fmt.Errorf("walk over files:%w", err))
-
-		return
-	}
-
-	files.End()
+	files.End(wrapIfError(err, "walk over files"))
 }
 
 func (g *commentsExtractor) extractComments(fileStream input[string], lineStream output[[]string], outputAbsPath string) {
 	i := 0
 
 	for filePath := range fileStream.Chan() {
-		if err := fileStream.Error(); err != nil {
-			lineStream.Destroy(err)
-		}
-
 		i++
 
 		relPathLink, err := getRelPathLink(outputAbsPath, filePath)
 		if err != nil {
-			lineStream.Destroy(fmt.Errorf("calculate relative path: %w", err))
+			lineStream.End(fmt.Errorf("calculate relative path: %w", err))
 			return
 		}
 
@@ -86,13 +81,13 @@ func (g *commentsExtractor) extractComments(fileStream input[string], lineStream
 
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			lineStream.Destroy(fmt.Errorf("read file [%s]: %w", filePath, err))
+			lineStream.End(fmt.Errorf("read file [%s]: %w", filePath, err))
 			return
 		}
 
 		lines, err := scanLines(content, g.inputPattern)
 		if err != nil {
-			lineStream.Destroy(fmt.Errorf("scan lines in file [%s]: %w", filePath, err))
+			lineStream.End(fmt.Errorf("scan lines in file [%s]: %w", filePath, err))
 			return
 		}
 
@@ -106,13 +101,13 @@ func (g *commentsExtractor) extractComments(fileStream input[string], lineStream
 		lineStream.Write(lines)
 	}
 
-	lineStream.End()
+	lineStream.End(fileStream.Error())
 }
 
 func (g *commentsExtractor) saveContent(outpLines input[[]string], result output[struct{}], outputAbsPath string) {
 	outputFile, err := os.Create(g.outputPath)
 	if err != nil {
-		result.Destroy(fmt.Errorf("create output file [%s]: %w", g.outputPath, err))
+		result.End(fmt.Errorf("create output file [%s]: %w", g.outputPath, err))
 		return
 	}
 	defer outputFile.Close()
@@ -122,25 +117,20 @@ func (g *commentsExtractor) saveContent(outpLines input[[]string], result output
 
 		err = appendContent(outputFile, headerContent)
 		if err != nil {
-			result.Destroy(fmt.Errorf("append header: %w", err))
+			result.End(fmt.Errorf("append header: %w", err))
 			return
 		}
 	}
 
 	for comments := range outpLines.Chan() {
-		if err := outpLines.Error(); err != nil {
-			result.Destroy(err)
-			return
-		}
-
 		err = appendContent(outputFile, comments)
 		if err != nil {
-			result.Destroy(fmt.Errorf("append content: %w", err))
+			result.End(fmt.Errorf("append content: %w", err))
 			return
 		}
 	}
 
-	result.End()
+	result.End(outpLines.Error())
 }
 
 func getRelPathLink(outputAbsPath string, filePath string) (string, error) {
@@ -155,11 +145,9 @@ func getRelPathLink(outputAbsPath string, filePath string) (string, error) {
 func appendContent(outputFile *os.File, lines []string) error {
 	schemaContent := strings.Join(lines, "\n")
 
-	if _, err := outputFile.WriteString(schemaContent); err != nil {
-		return fmt.Errorf("write line to output file: %w", err)
-	}
+	_, err := outputFile.WriteString(schemaContent)
 
-	return nil
+	return wrapIfError(err, "write line to output file")
 }
 
 func scanLines(content []byte, inputPattern string) ([]string, error) {
@@ -197,9 +185,5 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scanner error: %w", err)
-	}
-
-	return lines, nil
+	return lines, wrapIfError(scanner.Err(), "scanner error")
 }
