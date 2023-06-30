@@ -27,28 +27,46 @@ func (g *commentsExtractor) ExtractComments() error {
 		return fmt.Errorf("get abs path [%s]: %w", g.outputPath, err)
 	}
 
-	fileStream := NewStream[string](64)
-	lineStream := NewStream[[]string](64)
+	filePaths := newStream[string](64)
+	content := newStream[[]string](64)
+	result := newStream[struct{}](64)
 
-	go g.getGoFiles(inputAbsPath, fileStream)
+	go g.getGoFiles(inputAbsPath, filePaths)
+	go g.extractComments(filePaths, content, outputAbsPath)
+	go g.saveContent(content, result, outputAbsPath)
 
-	outputFile, err := os.Create(g.outputPath)
-	if err != nil {
-		return fmt.Errorf("create output file [%s]: %w", g.outputPath, err)
-	}
-	defer outputFile.Close()
+	<-result.Chan()
 
-	go g.extractCommentsFromFilesAndSave(fileStream, lineStream, outputAbsPath, outputFile)
-
-	err = g.saveLines(lineStream, outputAbsPath, outputFile)
-	if err != nil {
-		return fmt.Errorf("extract comments: %w", err)
+	if err := result.Error(); err != nil {
+		return fmt.Errorf("chain error: %w", err)
 	}
 
 	return nil
 }
 
-func (g *commentsExtractor) extractCommentsFromFilesAndSave(fileStream *streamChain[string], lineStream *streamChain[[]string], outputAbsPath string, outputFile *os.File) {
+func (g *commentsExtractor) getGoFiles(dir string, files output[string]) {
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("walking to %s: %w", path, err)
+		}
+
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".go") {
+			files.Write(path)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		files.Destroy(fmt.Errorf("walk over files:%w", err))
+
+		return
+	}
+
+	files.End()
+}
+
+func (g *commentsExtractor) extractComments(fileStream input[string], lineStream output[[]string], outputAbsPath string) {
 	i := 0
 
 	for filePath := range fileStream.Chan() {
@@ -83,7 +101,6 @@ func (g *commentsExtractor) extractCommentsFromFilesAndSave(fileStream *streamCh
 		}
 
 		lines = append(lines, "")
-
 		lines = append([]string{link, ""}, lines...)
 
 		lineStream.Write(lines)
@@ -92,30 +109,38 @@ func (g *commentsExtractor) extractCommentsFromFilesAndSave(fileStream *streamCh
 	lineStream.End()
 }
 
-func (g *commentsExtractor) saveLines(outpLines *streamChain[[]string], outputAbsPath string, outputFile *os.File) error {
-	var err error
+func (g *commentsExtractor) saveContent(outpLines input[[]string], result output[struct{}], outputAbsPath string) {
+	outputFile, err := os.Create(g.outputPath)
+	if err != nil {
+		result.Destroy(fmt.Errorf("create output file [%s]: %w", g.outputPath, err))
+		return
+	}
+	defer outputFile.Close()
 
 	if g.header != "" {
 		headerContent := []string{g.header, "\n"}
 
 		err = appendContent(outputFile, headerContent)
 		if err != nil {
-			return fmt.Errorf("append header: %w", err)
+			result.Destroy(fmt.Errorf("append header: %w", err))
+			return
 		}
 	}
 
 	for comments := range outpLines.Chan() {
 		if err := outpLines.Error(); err != nil {
-			return err
+			result.Destroy(err)
+			return
 		}
 
 		err = appendContent(outputFile, comments)
 		if err != nil {
-			return fmt.Errorf("append content: %w", err)
+			result.Destroy(fmt.Errorf("append content: %w", err))
+			return
 		}
 	}
 
-	return nil
+	result.End()
 }
 
 func getRelPathLink(outputAbsPath string, filePath string) (string, error) {
@@ -177,26 +202,4 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 	}
 
 	return lines, nil
-}
-
-func (g *commentsExtractor) getGoFiles(dir string, st *streamChain[string]) {
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("walking to %s: %w", path, err)
-		}
-
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".go") {
-			st.Chan() <- path
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		st.Destroy(fmt.Errorf("walk over files:%w", err))
-
-		return
-	}
-
-	st.End()
 }
