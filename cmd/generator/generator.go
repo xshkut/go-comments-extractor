@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -28,10 +27,10 @@ func (g *commentsExtractor) ExtractComments() error {
 		return fmt.Errorf("get abs path [%s]: %w", g.outputPath, err)
 	}
 
-	goFiles, err := g.getGoFiles(inputAbsPath)
-	if err != nil {
-		return fmt.Errorf("list files [%s]: %w", inputAbsPath, err)
-	}
+	fileStream := NewStream[string](64)
+	lineStream := NewStream[[]string](64)
+
+	go g.getGoFiles(inputAbsPath, fileStream)
 
 	outputFile, err := os.Create(g.outputPath)
 	if err != nil {
@@ -39,7 +38,9 @@ func (g *commentsExtractor) ExtractComments() error {
 	}
 	defer outputFile.Close()
 
-	err = g.extractCommentsFromFilesAndSave(goFiles, outputAbsPath, outputFile)
+	go g.extractCommentsFromFilesAndSave(fileStream, lineStream, outputAbsPath, outputFile)
+
+	err = g.saveLines(lineStream, outputAbsPath, outputFile)
 	if err != nil {
 		return fmt.Errorf("extract comments: %w", err)
 	}
@@ -47,46 +48,68 @@ func (g *commentsExtractor) ExtractComments() error {
 	return nil
 }
 
-func (g *commentsExtractor) extractCommentsFromFilesAndSave(files []string, outputAbsPath string, outputFile *os.File) error {
-	if g.header != "" {
-		headerContent := []string{g.header, "\n"}
+func (g *commentsExtractor) extractCommentsFromFilesAndSave(fileStream *streamChain[string], lineStream *streamChain[[]string], outputAbsPath string, outputFile *os.File) {
+	i := 0
 
-		err := appendContent(outputFile, headerContent)
-		if err != nil {
-			return fmt.Errorf("append header: %w", err)
+	for filePath := range fileStream.Chan() {
+		if err := fileStream.Error(); err != nil {
+			lineStream.Destroy(err)
 		}
-	}
 
-	for i, filePath := range files {
+		i++
+
 		relPathLink, err := getRelPathLink(outputAbsPath, filePath)
 		if err != nil {
-			return fmt.Errorf("calculate relative path: %w", err)
+			lineStream.Destroy(fmt.Errorf("calculate relative path: %w", err))
+			return
 		}
 
 		link := fmt.Sprintf("%s source: %s", g.outputCommentPrefix, relPathLink)
 
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			return fmt.Errorf("read file [%s]: %w", filePath, err)
+			lineStream.Destroy(fmt.Errorf("read file [%s]: %w", filePath, err))
+			return
 		}
 
 		lines, err := scanLines(content, g.inputPattern)
 		if err != nil {
-			return fmt.Errorf("scan lines in file [%s]: %w", filePath, err)
+			lineStream.Destroy(fmt.Errorf("scan lines in file [%s]: %w", filePath, err))
+			return
 		}
 
 		if len(lines) == 0 {
 			continue
 		}
 
-		lastFile := i == len(files)-1
-		if !lastFile {
-			lines = append(lines, "")
-		}
+		lines = append(lines, "")
 
 		lines = append([]string{link, ""}, lines...)
 
-		err = appendContent(outputFile, lines)
+		lineStream.Write(lines)
+	}
+
+	lineStream.End()
+}
+
+func (g *commentsExtractor) saveLines(outpLines *streamChain[[]string], outputAbsPath string, outputFile *os.File) error {
+	var err error
+
+	if g.header != "" {
+		headerContent := []string{g.header, "\n"}
+
+		err = appendContent(outputFile, headerContent)
+		if err != nil {
+			return fmt.Errorf("append header: %w", err)
+		}
+	}
+
+	for comments := range outpLines.Chan() {
+		if err := outpLines.Error(); err != nil {
+			return err
+		}
+
+		err = appendContent(outputFile, comments)
 		if err != nil {
 			return fmt.Errorf("append content: %w", err)
 		}
@@ -156,22 +179,24 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 	return lines, nil
 }
 
-func (g *commentsExtractor) getGoFiles(dir string) ([]string, error) {
-	var goFiles []string
-
+func (g *commentsExtractor) getGoFiles(dir string, st *streamChain[string]) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("walking to %s: %w", path, err)
 		}
 
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".go") {
-			goFiles = append(goFiles, path)
+			st.Chan() <- path
 		}
 
 		return nil
 	})
 
-	sort.Strings(goFiles)
+	if err != nil {
+		st.Destroy(fmt.Errorf("walk over files:%w", err))
 
-	return goFiles, err
+		return
+	}
+
+	st.End()
 }

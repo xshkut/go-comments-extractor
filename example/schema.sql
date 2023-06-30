@@ -41,3 +41,4 @@ CREATE TABLE task (
     created_by INTEGER NOT NULL REFERENCES user(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
