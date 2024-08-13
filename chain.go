@@ -30,10 +30,10 @@ func (s *chain[T]) Chan() chan T {
 	return s.ch
 }
 
-func newStream[T any](cap int) *chain[T] {
+func newStream[T any](capacity int) *chain[T] {
 	return &chain[T]{
 		err: nil,
-		ch:  make(chan T, cap),
+		ch:  make(chan T, capacity),
 	}
 }
 

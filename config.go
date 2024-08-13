@@ -4,36 +4,51 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 )
 
-var (
-	inputPath    string
-	outputFile   string
-	inputPrefix  string
-	outputPrefix string
-	header       string
-)
+func parseConfig() CommentsExtractorConfig {
+	flagSet := flag.NewFlagSet("main", flag.ExitOnError)
 
-func init() {
-	flag.StringVar(&inputPath, "i", "./", "Root input path (file or folder)")
-	flag.StringVar(&outputFile, "o", "", "Output file. Required")
-	flag.StringVar(&inputPrefix, "p", "", "Prefix going right after the beginning of Go multiline comment plus whitespace. Required")
-	flag.StringVar(&outputPrefix, "c", "", "Prefix for comments in the output file. Optional")
-	flag.StringVar(&header, "h", "", "Header of the output file. Optional")
+	inputPath := flagSet.String("i", "./", "Root input path (file or folder)")
+	outputFile := flagSet.String("o", "", "Output file. Required")
+	inputPrefix := flagSet.String(
+		"p",
+		"",
+		"Prefix going right after the beginning of Go multiline comment plus whitespace. Required",
+	)
+	outputPrefix := flagSet.String("c", "", "Prefix for comments in the output file. Optional")
+	header := flagSet.String("h", "", "Header of the output file. Optional")
 
-	flag.Usage = func() {
+	flagSet.Usage = func() {
 		fmt.Println("Extracts multiline comments with given prefix into a single file. Usage:")
 		fmt.Println()
-		flag.PrintDefaults()
+		flagSet.PrintDefaults()
 	}
 
-	flag.Parse()
+	err := flagSet.Parse(os.Args[1:])
+	if err != nil {
+		flagSet.Usage()
+		os.Exit(1)
+	}
 
-	if inputPrefix == "" {
+	if inputPrefix == nil {
 		log.Fatal("specify input prefix -p. Usage: --help")
 	}
 
-	if outputFile == "" {
+	if outputFile == nil {
 		log.Fatal("specify input prefix -p. Usage: --help")
+	}
+
+	if outputPrefix == nil {
+		log.Fatal("specify input prefix -p. Usage: --help")
+	}
+
+	return CommentsExtractorConfig{
+		InputCommentPattern: *inputPrefix,
+		InputPath:           *inputPath,
+		OutputPath:          *outputFile,
+		OutputCommentPrefix: *outputPrefix,
+		OutputFileHeader:    *header,
 	}
 }

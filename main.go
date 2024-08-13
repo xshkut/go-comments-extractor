@@ -6,15 +6,9 @@ import (
 )
 
 func main() {
-	g := commentsExtractor{
-		inputPattern:        inputPrefix,
-		inputPath:           inputPath,
-		outputPath:          outputFile,
-		outputCommentPrefix: outputPrefix,
-		header:              header,
-	}
+	cfg := parseConfig()
 
-	err := g.ExtractComments()
+	err := NewCommentsExtractor(cfg).ExtractComments()
 	if err != nil {
 		fmt.Printf("Schema generation failed: %s\n", err)
 		os.Exit(1)

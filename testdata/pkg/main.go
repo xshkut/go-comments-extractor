@@ -1,6 +1,6 @@
-package main
+package pkg
 
-func main() {
+func UseTypes() {
 	_ = File{}
 	_ = Task{}
 	_ = TaskPage{}

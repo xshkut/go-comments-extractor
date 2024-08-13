@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-type commentsExtractor struct {
+type extractor struct {
 	inputPath           string
 	outputPath          string
 	inputPattern        string
@@ -17,7 +17,25 @@ type commentsExtractor struct {
 	header              string
 }
 
-func (g *commentsExtractor) ExtractComments() error {
+type CommentsExtractorConfig struct {
+	InputPath           string
+	OutputPath          string
+	InputCommentPattern string
+	OutputCommentPrefix string
+	OutputFileHeader    string
+}
+
+func NewCommentsExtractor(cfg CommentsExtractorConfig) *extractor {
+	return &extractor{
+		inputPath:           cfg.InputPath,
+		outputPath:          cfg.OutputPath,
+		inputPattern:        cfg.InputCommentPattern,
+		outputCommentPrefix: cfg.OutputCommentPrefix,
+		header:              cfg.OutputFileHeader,
+	}
+}
+
+func (g *extractor) ExtractComments() error {
 	inputAbsPath, err := filepath.Abs(g.inputPath)
 	if err != nil {
 		return fmt.Errorf("get abs path [%s]: %w", g.inputPath, err)
@@ -45,7 +63,7 @@ func (g *commentsExtractor) ExtractComments() error {
 	return wrapIfError(err, "chain error")
 }
 
-func (g *commentsExtractor) getGoFiles(ctx context.Context, dir string, files output[string]) {
+func (g *extractor) getGoFiles(ctx context.Context, dir string, files output[string]) {
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("context error: %w", err)
@@ -65,7 +83,7 @@ func (g *commentsExtractor) getGoFiles(ctx context.Context, dir string, files ou
 	files.End(wrapIfError(err, "walk over files"))
 }
 
-func (g *commentsExtractor) extractComments(fileStream input[string], lineStream output[[]string], outputAbsPath string) {
+func (g *extractor) extractComments(fileStream input[string], lineStream output[[]string], outputAbsPath string) {
 	i := 0
 
 	for filePath := range fileStream.Chan() {
@@ -104,8 +122,8 @@ func (g *commentsExtractor) extractComments(fileStream input[string], lineStream
 	lineStream.End(fileStream.Error())
 }
 
-func (g *commentsExtractor) saveContent(outpLines input[[]string], result output[struct{}], outputAbsPath string) {
-	outputFile, err := os.Create(g.outputPath)
+func (g *extractor) saveContent(outpLines input[[]string], result output[struct{}], outputAbsPath string) {
+	outputFile, err := os.Create(outputAbsPath)
 	if err != nil {
 		result.End(fmt.Errorf("create output file [%s]: %w", g.outputPath, err))
 		return
@@ -164,24 +182,20 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if extracting {
-			if strings.HasPrefix(line, "*/") {
-				extracting = false
-				lines = append(lines, "")
-				continue
-			}
+		switch {
+		case extracting && strings.HasPrefix(line, "*/"):
+			extracting = false
 
+			lines = append(lines, "")
+		case extracting:
 			lines = append(lines, line)
-		} else if strings.HasPrefix(line, multilinePrefix) {
+		case strings.HasPrefix(line, multilinePrefix):
 			extracting = true
-		} else if strings.HasPrefix(line, singlelinePrefix) {
+		case strings.HasPrefix(line, singlelinePrefix):
 			line = strings.TrimPrefix(line, singlelinePrefix)
 			line = strings.TrimSpace(line)
 
-			lines = append(lines, line)
-			lines = append(lines, "")
-		} else {
-			continue
+			lines = append(lines, line, "")
 		}
 	}
 

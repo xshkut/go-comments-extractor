@@ -1,4 +1,4 @@
-package main
+package pkg
 
 /* SQL:
 CREATE TABLE page (

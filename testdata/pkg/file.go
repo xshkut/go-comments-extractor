@@ -1,4 +1,4 @@
-package main
+package pkg
 
 // SQL: CREATE TYPE file_source AS ENUM ('aws_s3', 'google_slides', 'text');
 
