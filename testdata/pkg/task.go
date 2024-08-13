@@ -3,7 +3,7 @@ package pkg
 /* SQL:
 CREATE TABLE task (
     id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL,
+    title TEXT NOT NULL, -- unique
     description TEXT NOT NULL,
     age_min INTEGER NOT NULL DEFAULT 0,
     age_max INTEGER NOT NULL DEFAULT 100,
@@ -17,7 +17,8 @@ CREATE TABLE task (
 
 // Task represents the task entity.
 type Task struct {
-	ID          int    `json:"id"`
+	ID int `json:"id"`
+	// SQL: CREATE UNIQUE INDEX idx_task_title ON task (title);
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	AgeMin      int    `json:"age_min"`

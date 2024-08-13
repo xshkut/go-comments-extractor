@@ -182,6 +182,10 @@ func scanLines(content []byte, inputPattern string) ([]string, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 
+		if !extracting {
+			line = strings.TrimSpace(line)
+		}
+
 		switch {
 		case extracting && strings.HasPrefix(line, "*/"):
 			extracting = false

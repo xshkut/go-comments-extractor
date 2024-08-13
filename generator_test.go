@@ -33,6 +33,7 @@ func Test_commentsExtractor_ExtractComments(t *testing.T) {
 
 	if !equal {
 		t.Error("Files are not equal")
+		t.FailNow()
 	}
 
 	err = os.Remove("testdata/schema.sql")

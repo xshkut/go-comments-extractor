@@ -33,7 +33,7 @@ CREATE TABLE task_page (
 
 CREATE TABLE task (
     id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL,
+    title TEXT NOT NULL, -- unique
     description TEXT NOT NULL,
     age_min INTEGER NOT NULL DEFAULT 0,
     age_max INTEGER NOT NULL DEFAULT 100,
@@ -41,4 +41,6 @@ CREATE TABLE task (
     created_by INTEGER NOT NULL REFERENCES user(id),
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX idx_task_title ON task (title);
 
