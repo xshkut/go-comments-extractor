@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -103,7 +104,10 @@ func (g *extractor) extractComments(fileStream input[string], lineStream output[
 			return
 		}
 
-		lines, err := scanLines(content, g.inputPattern)
+		multilinePrefix := fmt.Sprintf("/* %s:", g.inputPattern)
+		singlelinePrefix := fmt.Sprintf("// %s:", g.inputPattern)
+
+		lines, err := scanLines(content, singlelinePrefix, multilinePrefix)
 		if err != nil {
 			lineStream.End(fmt.Errorf("scan lines in file [%s]: %w", filePath, err))
 			return
@@ -168,40 +172,37 @@ func appendContent(outputFile *os.File, lines []string) error {
 	return wrapIfError(err, "write line to output file")
 }
 
-func scanLines(content []byte, inputPattern string) ([]string, error) {
-	scanner := bufio.NewScanner(strings.NewReader(string(content)))
+func scanLines(content []byte, singlelinePrefix, multilinePrefix string) ([]string, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(content))
 	scanner.Split(bufio.ScanLines)
 
 	lines := make([]string, 0)
 
 	var extracting bool
 
-	multilinePrefix := fmt.Sprintf("/* %s:", inputPattern)
-	singlelinePrefix := fmt.Sprintf("// %s:", inputPattern)
+	multiLineCommentOffset := 0
 
 	for scanner.Scan() {
 		line := scanner.Text()
-
-		if !extracting {
-			line = strings.TrimSpace(line)
-		}
+		trimmedLine := strings.TrimSpace(line)
 
 		switch {
-		case extracting && strings.HasPrefix(line, "*/"):
+		case extracting && strings.HasPrefix(trimmedLine, "*/"):
 			extracting = false
 
 			lines = append(lines, "")
 		case extracting:
-			lines = append(lines, line)
-		case strings.HasPrefix(line, multilinePrefix):
+			lines = append(lines, line[multiLineCommentOffset:])
+		case strings.HasPrefix(trimmedLine, multilinePrefix):
+			multiLineCommentOffset = strings.Index(line, multilinePrefix)
 			extracting = true
-		case strings.HasPrefix(line, singlelinePrefix):
-			line = strings.TrimPrefix(line, singlelinePrefix)
+		case strings.HasPrefix(trimmedLine, singlelinePrefix):
+			line = strings.TrimPrefix(trimmedLine, singlelinePrefix)
 			line = strings.TrimSpace(line)
 
 			lines = append(lines, line, "")
 		}
 	}
 
-	return lines, wrapIfError(scanner.Err(), "scanner error")
+	return lines, wrapIfError(scanner.Err(), "scan lines")
 }

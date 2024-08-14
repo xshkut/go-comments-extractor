@@ -23,7 +23,10 @@ CREATE TABLE task_page (
 
 // Page represents the page entity.
 type Page struct {
-	ID        int    `json:"id"`
+	ID int `json:"id"`
+	/* SQL:
+	CREATE UNIQUE INDEX idx_page_title ON page (title);
+	*/
 	Title     string `json:"title"`
 	FileID    int    `json:"file_id,omitempty"`
 	CreatedBy int    `json:"created_by"`

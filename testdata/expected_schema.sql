@@ -29,6 +29,8 @@ CREATE TABLE task_page (
     PRIMARY KEY (task_id, page_id, position)
 );
 
+CREATE UNIQUE INDEX idx_page_title ON page (title);
+
 -- source: file://./pkg/task.go
 
 CREATE TABLE task (
