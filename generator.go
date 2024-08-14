@@ -192,6 +192,12 @@ func scanLines(content []byte, singlelinePrefix, multilinePrefix string) ([]stri
 
 			lines = append(lines, "")
 		case extracting:
+			if multiLineCommentOffset > len(line) {
+				fmt.Println("offset:", multiLineCommentOffset)
+				fmt.Println("line:\n", line)
+				panic("multi-line comment offset is out of bounds. This should not have happened")
+			}
+
 			lines = append(lines, line[multiLineCommentOffset:])
 		case strings.HasPrefix(trimmedLine, multilinePrefix):
 			multiLineCommentOffset = strings.Index(line, multilinePrefix)
