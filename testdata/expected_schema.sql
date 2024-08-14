@@ -12,6 +12,10 @@ CREATE TABLE file (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX idx_file_key ON file (key);
+
+CREATE INDEX idx_file_created_by ON file (created_by);
+
 -- source: file://./pkg/page.go
 
 CREATE TABLE page (

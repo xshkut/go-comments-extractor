@@ -25,7 +25,12 @@ const (
 
 // File represents the file entity.
 type File struct {
-	ID        int        `json:"id"`
+	ID int `json:"id"`
+	/* SQL: (testing insufficient indentation between lines)
+	CREATE UNIQUE INDEX idx_file_key ON file (key);
+
+	CREATE INDEX idx_file_created_by ON file (created_by);
+	*/
 	Source    FileSource `json:"source"`
 	Key       string     `json:"key"`
 	CreatedBy int        `json:"created_by"`
